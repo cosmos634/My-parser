@@ -13,35 +13,6 @@ logging.basicConfig(
 )
 
 
-def cmd_add(args):
-    analysis = score_lead(args.title, args.description, args.budget, args.contact, args.published_at)
-    data = {
-        "title": args.title, "description": args.description,
-        "source": args.source, "source_name": args.source_name,
-        "url": args.url, "contact": args.contact, "budget": args.budget,
-        "published_at": args.published_at, **analysis,
-    }
-    created, lead_id = add_lead(data)
-    if created:
-        print(f"Saved lead #{lead_id}: {analysis['status']} {analysis['score']}/100")
-        print("Scoring:", json.dumps(analysis["score_breakdown"], ensure_ascii=False))
-    else:
-        print("Duplicate skipped: this URL or content already exists.")
-
-
-def cmd_leads(args):
-    rows = list_leads(args.hot, args.limit)
-    if not rows:
-        print("No leads yet. Add one with: python main.py add --title ...")
-        return
-    for row in rows:
-        print(f"\n[{row['status']}] {row['score']}/100 — {row['title']}")
-        print(f"Category: {row['category']} | Intent: {row['intent']} | Language: {row['language']}")
-        print(f"Source: {row['source_name']} ({row['source']})")
-        print(f"Budget: {row['budget'] or 'Unknown'} | Contact: {row['contact'] or 'Not provided'}")
-        print(f"URL: {row['url'] or 'Not provided'}")
-
-
 def main():
     parser = argparse.ArgumentParser(description="Lead Finder — client discovery MVP")
     parser.add_argument("--db", default=DEFAULT_DB, help="SQLite database path")
@@ -69,11 +40,30 @@ def main():
         print(f"Database initialized: {args.db}")
     elif args.command == "add":
         init_db(args.db)
-        cmd_add(args)
+        analysis = score_lead(args.title, args.description, args.budget, args.contact, args.published_at)
+        data = {
+            "title": args.title, "description": args.description,
+            "source": args.source, "source_name": args.source_name,
+            "url": args.url, "contact": args.contact, "budget": args.budget,
+            "published_at": args.published_at, **analysis,
+        }
+        created, lead_id = add_lead(data, args.db)
+        if created:
+            print(f"Saved lead #{lead_id}: {analysis['status']} {analysis['score']}/100")
+            print("Scoring:", json.dumps(analysis["score_breakdown"], ensure_ascii=False))
+        else:
+            print("Duplicate skipped: this URL or content already exists.")
     elif args.command == "leads":
         init_db(args.db)
-        for row in list_leads(args.hot, args.limit, args.db):
-            print(f"[{row['status']}] {row['score']}/100 — {row['title']} | {row['url'] or 'no URL'}")
+        rows = list_leads(args.hot, args.limit, args.db)
+        if not rows:
+            print("No leads found.")
+        for row in rows:
+            print(f"\\n[{row['status']}] {row['score']}/100 — {row['title']}")
+            print(f"Category: {row['category']} | Intent: {row['intent']} | Language: {row['language']}")
+            print(f"Source: {row['source_name']} ({row['source']})")
+            print(f"Budget: {row['budget'] or 'Unknown'} | Contact: {row['contact'] or 'Not provided'}")
+            print(f"URL: {row['url'] or 'Not provided'}")
     elif args.command == "stats":
         init_db(args.db)
         print(json.dumps(get_stats(args.db), ensure_ascii=False, indent=2))
